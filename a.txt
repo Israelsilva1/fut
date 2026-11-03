@@ -1,0 +1,38 @@
+Com base na análise do código desofuscado dos arquivos da extensão (manifest.json, injector.js e payload.js), é possível responder tecnicamente como a extensão lida (ou não lida) com requisições de rede e créditos:
+
+1. Ausência de Interceptação Local no Código da Extensão
+
+Nos arquivos presentes no pacote analisado, não existe nenhuma linha de código que intercepte requisições de rede ou altere a contagem de créditos localmente.
+
+Especificamente:
+
+No manifest.json:
+O array "permissions" está vazio ([]).
+A extensão não possui as permissões webRequest, webRequestBlocking ou declarativeNetRequest, que são as APIs do Chrome necessárias para interceptar, redirecionar ou inspecionar requisições HTTP/HTTPS a nível de navegador.
+No injector.js:
+O script apenas lê o config.json e anexa uma tag <meta> com os dados do revendedor no DOM.
+No payload.js:
+O script apenas fecha janelas de popup de OAuth (lvbup_oauth=close) e cria uma tag <script> apontando para o arquivo remoto:
+javascript
+var _0x5ac94c = "https://pub-8dbbacef2ad3498f94e9db81ff7a5981.r2.dev/core.js";
+2. Onde a Lógica Realmente Reside
+
+Como os arquivos locais funcionam estritamente como um loader (stager), qualquer modificação de comportamento na interface do Lovable é baixada em tempo de execução via core.js.
+
+Se o script remoto tentar alterar a experiência de créditos, a execução no contexto da página (MAIN world) permite tecnicamente:
+
+Monkey Patching de APIs Nativas (window.fetch / XMLHttpRequest):
+Como o payload.js é injetado diretamente no DOM da página, o código remoto tem acesso ao mesmo objeto global window que a aplicação Lovable.
+Isso permite substituir o window.fetch original por uma função customizada para inspecionar ou alterar os corpos de requisição e resposta enviados para endpoints de API.
+Manipulação do Estado de UI / Frontend:
+O script pode alterar componentes visuais (React/DOM) para ocultar avisos de limite de cota ou simular um status de assinatura "VIP / Pro" na interface do usuário.
+3. A Realidade Técnica Sobre a "Anulação" de Créditos
+
+Sob a perspectiva de segurança de aplicações web:
+
+Controle no Servidor (Server-Side Enforcement): Em plataformas como o Lovable, a geração de código e as chamadas a modelos de linguagem (LLMs) dependem de chaves de API e cotas controladas no servidor da empresa.
+Inviabilidade de Bypass Apenas no Cliente: Mesmo que um script local manipule o window.fetch ou altere a interface para exibir "Créditos Ilimitados", requisições reais de geração enviadas ao backend do Lovable retornarão erros 402 Payment Required ou 429 Too Many Requests se o servidor validar os créditos da conta.
+Possíveis Alternativas Usadas por Extensões Desse Tipo:
+Uso de Chave Própria (BYOK / Proxy): O script remoto intercepta as requisições de geração e as desvia para uma API externa (ou proxy do próprio fornecedor da extensão) em vez de usar os créditos da conta oficial do Lovable.
+Automação de Criação de Contas: Uso de múltiplas contas descartáveis para alternar tokens de teste gratuito (Free Tier).
+Efeito Puramente Cosmético: Apenas desbloquear campos e botões da interface, sem capacidade real de gerar respostas quando a cota no servidor se esgota.
